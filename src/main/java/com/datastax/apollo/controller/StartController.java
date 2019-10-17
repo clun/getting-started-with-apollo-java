@@ -1,0 +1,15 @@
+package com.datastax.apollo.controller;
+
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import io.swagger.annotations.Api;
+
+@RestController
+@Api(value = "/api/launch", description = "Initializing backend")
+@RequestMapping("/api/launch")
+public class StartController {
+    
+    
+
+}
