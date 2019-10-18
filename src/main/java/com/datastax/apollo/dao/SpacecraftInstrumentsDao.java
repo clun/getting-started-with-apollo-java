@@ -6,8 +6,8 @@ import java.util.function.Function;
 
 import com.datastax.apollo.entity.SpacecraftLocationOverTime;
 import com.datastax.apollo.entity.SpacecraftPressureOverTime;
+import com.datastax.apollo.entity.SpacecraftSpeedOverTime;
 import com.datastax.apollo.entity.SpacecraftTemperatureOverTime;
-import com.datastax.apollo.model.PagedResultWrapper;
 import com.datastax.oss.driver.api.core.PagingIterable;
 import com.datastax.oss.driver.api.core.cql.BoundStatementBuilder;
 import com.datastax.oss.driver.api.mapper.annotations.Dao;
@@ -34,28 +34,44 @@ public interface SpacecraftInstrumentsDao {
      */
     @QueryProvider(providerClass = SpacecraftInstrumentsQueryProvider.class, 
        entityHelpers = { SpacecraftTemperatureOverTime.class, SpacecraftPressureOverTime.class, 
-                         SpacecraftLocationOverTime.class})
+                         SpacecraftLocationOverTime.class, SpacecraftSpeedOverTime.class})
     PagingIterable<SpacecraftTemperatureOverTime> getTemperatureReading(
-            String spacecraftName, UUID JourneyId, Optional<Integer> pageSize,
-            Optional<String> pagingState);
+            String spacecraftName, UUID JourneyId, Optional<Integer> pageSize, Optional<String> pagingState);
     
     /**
      * Search for pressure readings.
      */
     @QueryProvider(providerClass = SpacecraftInstrumentsQueryProvider.class, 
        entityHelpers = { SpacecraftTemperatureOverTime.class, SpacecraftPressureOverTime.class, 
-                         SpacecraftLocationOverTime.class})
-    PagedResultWrapper<SpacecraftPressureOverTime> getPressureReading(
-            String spacecraftName, UUID JourneyId, Optional<Integer> pageSize,
-            Optional<String>  pagingState);
+                         SpacecraftLocationOverTime.class, SpacecraftSpeedOverTime.class})
+    PagingIterable<SpacecraftPressureOverTime> getPressureReading(
+            String spacecraftName, UUID JourneyId, Optional<Integer> pageSize, Optional<String> pagingState);
+    
+    /**
+     * Search for speed readings.
+     */
+    @QueryProvider(providerClass = SpacecraftInstrumentsQueryProvider.class, 
+       entityHelpers = { SpacecraftTemperatureOverTime.class, SpacecraftPressureOverTime.class, 
+                         SpacecraftLocationOverTime.class, SpacecraftSpeedOverTime.class})
+    PagingIterable<SpacecraftSpeedOverTime> getSpeedReading(
+            String spacecraftName, UUID JourneyId, Optional<Integer> pageSize, Optional<String> spagingState);
     
     /**
      * Search for location readings.
      */
     @QueryProvider(providerClass = SpacecraftInstrumentsQueryProvider.class, 
        entityHelpers = { SpacecraftTemperatureOverTime.class, SpacecraftPressureOverTime.class, 
-                         SpacecraftLocationOverTime.class})
-    PagedResultWrapper<SpacecraftLocationOverTime> getLocationReading(
-            String spacecraftName, UUID JourneyId, Optional<Integer> pageSize,
-            Optional<String>  pagingState);
+                         SpacecraftLocationOverTime.class, SpacecraftSpeedOverTime.class})
+    PagingIterable<SpacecraftLocationOverTime> getLocationReading(
+            String spacecraftName, UUID JourneyId, Optional<Integer> pageSize, Optional<String> pagingState);
+    
+    /**
+     * Insert instruments.
+     */
+    @QueryProvider(providerClass = SpacecraftInstrumentsQueryProvider.class, 
+            entityHelpers = { SpacecraftTemperatureOverTime.class, SpacecraftPressureOverTime.class, 
+                              SpacecraftLocationOverTime.class, SpacecraftSpeedOverTime.class})
+    void insertInstruments(
+            SpacecraftTemperatureOverTime temperature, SpacecraftPressureOverTime pressure,  
+            SpacecraftSpeedOverTime speed, SpacecraftLocationOverTime location);
 }

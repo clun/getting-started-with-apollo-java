@@ -39,7 +39,7 @@ public class CredentialsController {
     
     /** Logger for the class. */
     private static final Logger LOGGER = LoggerFactory.getLogger(CredentialsController.class);
-    
+   
     @ExceptionHandler(value = IllegalArgumentException.class)
     @ResponseStatus(value = HttpStatus.BAD_REQUEST)
     public String _errorBadRequestHandler(IllegalArgumentException ex) {

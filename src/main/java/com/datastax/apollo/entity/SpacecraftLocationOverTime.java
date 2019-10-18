@@ -7,7 +7,7 @@ import com.datastax.oss.driver.api.mapper.annotations.Entity;
  * Bean Mapping table spacecraft_temperature_over_time.
  */
 @Entity
-@CqlName("spacecraft_location_over_time")
+@CqlName(SpacecraftLocationOverTime.TABLE_NAME)
 public class SpacecraftLocationOverTime extends AbstractInstrumentReading {
     
     /** Constants. */

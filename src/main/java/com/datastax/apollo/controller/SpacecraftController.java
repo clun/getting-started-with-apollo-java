@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -50,7 +51,7 @@ public class SpacecraftController {
     private static final Logger LOGGER = LoggerFactory.getLogger(SpacecraftController.class);
     
     /** Service implementation Injection. */
-    private ApolloService spacecraftService;
+    private ApolloService apolloService;
 
     /**
      * Constructor.
@@ -59,7 +60,7 @@ public class SpacecraftController {
      *      service implementation
      */
     public SpacecraftController(ApolloService spacecraftService) {
-        this.spacecraftService = spacecraftService;
+        this.apolloService = spacecraftService;
     }
     
     /**
@@ -73,7 +74,7 @@ public class SpacecraftController {
     @ApiResponse(code = 200, message = "List all journeys for a spacecraft")
     public ResponseEntity<List<SpacecraftJourneyCatalog>> findAllSpacecrafts() {
         LOGGER.info("Retrieving all spacecrafts");
-        return ResponseEntity.ok(spacecraftService.findAllSpacecrafts());
+        return ResponseEntity.ok(apolloService.findAllSpacecrafts());
     }
     
     /**
@@ -91,7 +92,7 @@ public class SpacecraftController {
             @ApiParam(name="spacecraftName", value="Spacecraft name",example = "gemini3",required=true )
             @PathVariable(value = "spacecraftName") String spaceCraftName) {
         LOGGER.info("Retrieving all journey for spacecraft {}", spaceCraftName);
-        return ResponseEntity.ok(spacecraftService.findAllJourneysForSpacecraft(spaceCraftName));
+        return ResponseEntity.ok(apolloService.findAllJourneysForSpacecraft(spaceCraftName));
     }
     
     /**
@@ -119,13 +120,37 @@ public class SpacecraftController {
             @PathVariable(value = "journeyId") UUID journeyId) {
         LOGGER.info("Fetching journey with spacecraft name {} and journeyid {}", spacecraftName, journeyId);
         // Invoking Service
-        Optional<SpacecraftJourneyCatalog> journey = spacecraftService.findJourneyById(spacecraftName, journeyId);
+        Optional<SpacecraftJourneyCatalog> journey = apolloService.findJourneyById(spacecraftName, journeyId);
         // Routing Result
         if (!journey.isPresent()) {
             LOGGER.warn("Journey with spacecraft name {} and journeyid {} has not been found", spacecraftName, journeyId);
             return ResponseEntity.notFound().build();
         }
         return ResponseEntity.ok(journey.get());
+    }
+    
+    @PostMapping(value = "/{spacecraftName}/{journeyId}/preload")
+    @ApiOperation(value = "Load all metrics in bulk mode", response = List.class)
+    @ApiResponses({
+        @ApiResponse(code = 200, message = "Loading is done"),
+        @ApiResponse(code = 400, message = "spacecraftName is blank or contains invalid characters (expecting AlphaNumeric)"),
+        @ApiResponse(code = 404, message = "No journey exists for the provided spacecraftName and journeyid")
+    })
+    public ResponseEntity<String> preload(
+            @ApiParam(name="spacecraftName", value="Spacecraft name",example = "gemini3",required=true )
+            @PathVariable(value = "spacecraftName") String spacecraftName,
+            @ApiParam(name="journeyId", value="Identifer for journey",example = "abb7c000-c310-11ac-8080-808080808080",required=true )
+            @PathVariable(value = "journeyId") UUID journeyId,
+            @RequestParam("itemCount") int itemCount) {
+        Optional<SpacecraftJourneyCatalog> journey = apolloService.findJourneyById(spacecraftName, journeyId);
+        if (!journey.isPresent()) {
+            LOGGER.warn("Journey with spacecraft name {} and journeyid {} has not been found", spacecraftName, journeyId);
+            return ResponseEntity.notFound().build();
+        }
+        long top = System.currentTimeMillis();
+        apolloService.preload(itemCount, spacecraftName, journeyId);
+        long stop = System.currentTimeMillis();
+        return ResponseEntity.ok(itemCount + " item(s) loaded in " + (stop-top) + "millis");
     }
     
     /**
@@ -148,7 +173,7 @@ public class SpacecraftController {
             @ApiParam(name="spacecraftName", value="Spacecraft name",example = "soyuztm-8",required=true )
             @PathVariable(value = "spacecraftName") String spacecraftName,
             @RequestBody String summary) {
-        UUID journeyId = spacecraftService.createSpacecraftJourney(spacecraftName, summary);
+        UUID journeyId = apolloService.createSpacecraftJourney(spacecraftName, summary);
         // HTTP Created spec, return target resource in 'location' header
         URI location = ServletUriComponentsBuilder.fromRequestUri(request)
                 .replacePath("/api/spacecrafts/{spacecraftName}/{journeyId}")

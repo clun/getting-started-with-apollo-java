@@ -11,12 +11,14 @@ import java.util.UUID;
 
 import com.datastax.apollo.entity.SpacecraftLocationOverTime;
 import com.datastax.apollo.entity.SpacecraftPressureOverTime;
+import com.datastax.apollo.entity.SpacecraftSpeedOverTime;
 import com.datastax.apollo.entity.SpacecraftTemperatureOverTime;
-import com.datastax.apollo.model.PagedResultWrapper;
 import com.datastax.oss.driver.api.core.CqlSession;
 import com.datastax.oss.driver.api.core.PagingIterable;
+import com.datastax.oss.driver.api.core.cql.BatchStatement;
 import com.datastax.oss.driver.api.core.cql.BoundStatement;
 import com.datastax.oss.driver.api.core.cql.BoundStatementBuilder;
+import com.datastax.oss.driver.api.core.cql.DefaultBatchType;
 import com.datastax.oss.driver.api.core.cql.PreparedStatement;
 import com.datastax.oss.driver.api.core.cql.ResultSet;
 import com.datastax.oss.driver.api.mapper.MapperContext;
@@ -37,15 +39,18 @@ public class SpacecraftInstrumentsQueryProvider {
     private EntityHelper<SpacecraftTemperatureOverTime> ehTemperature;
     private EntityHelper<SpacecraftPressureOverTime>    ehPressure;
     private EntityHelper<SpacecraftLocationOverTime>    ehLocation;
+    private EntityHelper<SpacecraftSpeedOverTime>       ehSpeed;
     
     /** Statements Against Apollo. */
     private PreparedStatement psInsertTemperatureReading;
     private PreparedStatement psInsertPressureReading;
     private PreparedStatement psInsertLocationReading;
+    private PreparedStatement psInsertSpeedReading;
     
     private PreparedStatement psSelectTemperatureReading;
     private PreparedStatement psSelectPressureReading;
     private PreparedStatement psSelectLocationReading;
+    private PreparedStatement psSelectSpeedReading;
     
     /**
      * Constructor invoked by the DataStax driver based on Annotation {@link QueryProvider} 
@@ -61,18 +66,21 @@ public class SpacecraftInstrumentsQueryProvider {
      *      entity helper to interact with bean {@link SpacecraftLocationOverTime}      
      */
     public SpacecraftInstrumentsQueryProvider(MapperContext context,
-            EntityHelper<SpacecraftTemperatureOverTime>  ehTemperature,
-            EntityHelper<SpacecraftPressureOverTime>     ehPressure,
-            EntityHelper<SpacecraftLocationOverTime>     ehLocation) {
+            EntityHelper<SpacecraftTemperatureOverTime> ehTemperature,
+            EntityHelper<SpacecraftPressureOverTime>    ehPressure,
+            EntityHelper<SpacecraftLocationOverTime>    ehLocation,
+            EntityHelper<SpacecraftSpeedOverTime>       ehSpeed) {
         this.cqlSession     = context.getSession();
         this.ehTemperature  = ehTemperature;
         this.ehPressure     = ehPressure;
+        this.ehSpeed        = ehSpeed;
         this.ehLocation     = ehLocation;
         
         // Leveraging EntityHelper for insert queries
         psInsertTemperatureReading = cqlSession.prepare(ehTemperature.insert().asCql());
         psInsertPressureReading    = cqlSession.prepare(ehPressure.insert().asCql());
         psInsertLocationReading    = cqlSession.prepare(ehLocation.insert().asCql());
+        psInsertSpeedReading       = cqlSession.prepare(ehSpeed.insert().asCql());
         
         psSelectTemperatureReading = cqlSession.prepare(
                 selectFrom(SpacecraftTemperatureOverTime.TABLE_NAME).all()
@@ -84,11 +92,30 @@ public class SpacecraftInstrumentsQueryProvider {
                 .where(column(COLUMN_SPACECRAFT_NAME).isEqualTo(bindMarker(COLUMN_SPACECRAFT_NAME)))
                 .where(column(COLUMN_JOURNEY_ID).isEqualTo(bindMarker(COLUMN_JOURNEY_ID)))
                 .build());
+        psSelectSpeedReading = cqlSession.prepare(
+                selectFrom(SpacecraftSpeedOverTime.TABLE_NAME).all()
+                .where(column(COLUMN_SPACECRAFT_NAME).isEqualTo(bindMarker(COLUMN_SPACECRAFT_NAME)))
+                .where(column(COLUMN_JOURNEY_ID).isEqualTo(bindMarker(COLUMN_JOURNEY_ID)))
+                .build());
         psSelectLocationReading = cqlSession.prepare(
                 selectFrom(SpacecraftLocationOverTime.TABLE_NAME).all()
                 .where(column(COLUMN_SPACECRAFT_NAME).isEqualTo(bindMarker(COLUMN_SPACECRAFT_NAME)))
                 .where(column(COLUMN_JOURNEY_ID).isEqualTo(bindMarker(COLUMN_JOURNEY_ID)))
                 .build());
+    }
+    
+    /**
+     * Insert instruments values for a timestamp.
+     */
+    public void insertInstruments(
+            SpacecraftTemperatureOverTime temperature, SpacecraftPressureOverTime pressure,  
+            SpacecraftSpeedOverTime speed, SpacecraftLocationOverTime location) {
+        cqlSession.executeAsync(BatchStatement.builder(DefaultBatchType.LOGGED)
+                .addStatement(bind(psInsertTemperatureReading, temperature, ehTemperature))
+                .addStatement(bind(psInsertPressureReading, pressure, ehPressure))
+                .addStatement(bind(psInsertSpeedReading, speed, ehSpeed))
+                .addStatement(bind(psInsertLocationReading, location, ehLocation))
+                .build()).thenApply(rs -> null);
     }
     
     /**
@@ -120,25 +147,34 @@ public class SpacecraftInstrumentsQueryProvider {
     /**
      * Retrieve Pressure reading for a journey.
      */
-    public PagedResultWrapper<SpacecraftPressureOverTime> getPressureReading(
+    public PagingIterable<SpacecraftPressureOverTime> getPressureReading(
             String spacecraftName, UUID journeyId, Optional<Integer> pageSize, Optional<String>  pagingState) {
-       return new PagedResultWrapper<SpacecraftPressureOverTime>(
-               cqlSession.execute(paging(psSelectPressureReading.bind()
+       return cqlSession.execute(paging(psSelectPressureReading.bind()
                        .setUuid(COLUMN_JOURNEY_ID, journeyId)
                        .setString(spacecraftName, spacecraftName), pageSize, pagingState))
-               .map(ehPressure::get), pageSize.isPresent() ? pageSize.get() : 0);
+               .map(ehPressure::get);
     }
     
     /**
      * Retrieve Location reading for a journey.
      */
-    public PagedResultWrapper<SpacecraftLocationOverTime> getLocationReading(
+    public PagingIterable<SpacecraftLocationOverTime> getLocationReading(
             String spacecraftName, UUID journeyId, Optional<Integer> pageSize, Optional<String>  pagingState) {
-       return new PagedResultWrapper<SpacecraftLocationOverTime>(
-               cqlSession.execute(paging(psSelectLocationReading.bind()
+       return cqlSession.execute(paging(psSelectLocationReading.bind()
                        .setUuid(COLUMN_JOURNEY_ID, journeyId)
                        .setString(spacecraftName, spacecraftName), pageSize, pagingState))
-               .map(ehLocation::get), pageSize.isPresent() ? pageSize.get() : 0);
+               .map(ehLocation::get);
+    }
+    
+    /**
+     * Retrieve Pressure reading for a journey.
+     */
+    public PagingIterable<SpacecraftSpeedOverTime> getSpeedReading(
+            String spacecraftName, UUID journeyId, Optional<Integer> pageSize, Optional<String>  pagingState) {
+       return cqlSession.execute(paging(psSelectSpeedReading.bind()
+                       .setUuid(COLUMN_JOURNEY_ID, journeyId)
+                       .setString(spacecraftName, spacecraftName), pageSize, pagingState))
+               .map(ehSpeed::get);
     }
     
     /**

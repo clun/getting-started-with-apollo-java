@@ -17,7 +17,11 @@ import com.datastax.apollo.dao.SpacecraftInstrumentsDao;
 import com.datastax.apollo.dao.SpacecraftJourneyDao;
 import com.datastax.apollo.dao.SpacecraftMapper;
 import com.datastax.apollo.dao.SpacecraftMapperBuilder;
+import com.datastax.apollo.entity.LocationUdt;
 import com.datastax.apollo.entity.SpacecraftJourneyCatalog;
+import com.datastax.apollo.entity.SpacecraftLocationOverTime;
+import com.datastax.apollo.entity.SpacecraftPressureOverTime;
+import com.datastax.apollo.entity.SpacecraftSpeedOverTime;
 import com.datastax.apollo.entity.SpacecraftTemperatureOverTime;
 import com.datastax.apollo.model.PagedResultWrapper;
 import com.datastax.oss.driver.api.core.CqlSession;
@@ -37,6 +41,66 @@ public class ApolloService {
     /** Driver Daos. */
     private SpacecraftJourneyDao     spacecraftJourneyDao;
     private SpacecraftInstrumentsDao spacecraftInstrumentsDao;
+    
+    
+    /**
+     * Insert reading into database.
+     *
+     * @param itemCount
+     *      current item count
+     */
+    public void preload(int itemCount, String spacecraftName, UUID journeyId) {
+        SpacecraftLocationOverTime    loc   = new SpacecraftLocationOverTime();
+        loc.setJourney_id(journeyId);
+        loc.setSpacecraft_name(spacecraftName);
+        loc.setLocation_unit("km");
+        SpacecraftTemperatureOverTime temp  = new SpacecraftTemperatureOverTime();
+        temp.setSpacecraft_name(spacecraftName);
+        temp.setJourney_id(journeyId);
+        temp.setTemperature_unit("fahrenheit");
+        SpacecraftPressureOverTime    press = new SpacecraftPressureOverTime();
+        press.setJourney_id(journeyId);
+        press.setSpacecraft_name(spacecraftName);
+        press.setPressure_unit("kPa");
+        SpacecraftSpeedOverTime       speed = new SpacecraftSpeedOverTime();temp.setJourney_id(journeyId);
+        speed.setJourney_id(journeyId);
+        speed.setSpacecraft_name(spacecraftName);
+        speed.setSpeed_unit("km/h");
+        Instant start = Instant.now();
+        for (int i = 0; i < itemCount; i++) {
+            temp.setReading_time(start);
+            press.setReading_time(start);
+            speed.setReading_time(start);
+            
+            LocationUdt udt = new LocationUdt(0,0,0);
+            loc.setLocation(udt);
+            loc.setReading_time(start);
+            temp.setTemperature(Double.valueOf(69.3));
+            press.setPressure(Double.valueOf(100.5));
+            speed.setSpeed(Double.valueOf(30000));
+            getSpaceCraftInstrumentsDao().insertInstruments(temp,press, speed, loc);
+            
+            // Compute next value
+            start = start.plusSeconds(1);
+            udt.setX_coordinate(udt.getX_coordinate()+1);
+            udt.setY_coordinate(udt.getY_coordinate()+1);
+            udt.setZ_coordinate(udt.getZ_coordinate()+5);
+            temp.setTemperature(createRandomValue(temp.getTemperature()));
+            press.setPressure(createRandomValue(press.getPressure()));
+            speed.setSpeed(createRandomValue(speed.getSpeed()));
+        }
+    }
+    
+    private double createRandomValue(double lastValue) {
+        double up = Math.random() * 2;
+        double percentMove = (Math.random() * 1.0) / 100;
+        if (up < 1) {
+          lastValue -= percentMove * lastValue;
+        } else {
+          lastValue += percentMove * lastValue;
+        }
+        return lastValue;
+      }
     
     /**
      * Find all spacecrafts in the catalog.
@@ -117,6 +181,75 @@ public class ApolloService {
         PagingIterable<SpacecraftTemperatureOverTime> daoResult = 
                 getSpaceCraftInstrumentsDao().getTemperatureReading(spacecraftName, journeyId, pageSize, pageState);
         return new PagedResultWrapper<SpacecraftTemperatureOverTime>(daoResult, 
+                pageSize.isPresent() ? pageSize.get() : 0);
+    }
+    
+    /**
+     * Retrieve pressure readings for a journey.
+     *
+     * @param spacecraftName
+     *      name of spacecrafr
+     * @param journeyId
+     *      journey identifier
+     * @param pageSize
+     *      page size
+     * @param pageState
+     *      page state
+     * @return
+     *      result page
+     */
+    public PagedResultWrapper<SpacecraftPressureOverTime> getPressureReading(
+            String spacecraftName, UUID journeyId, 
+            Optional<Integer> pageSize, Optional<String> pageState) {
+        PagingIterable<SpacecraftPressureOverTime> daoResult = 
+                getSpaceCraftInstrumentsDao().getPressureReading(spacecraftName, journeyId, pageSize, pageState);
+        return new PagedResultWrapper<SpacecraftPressureOverTime>(daoResult, 
+                pageSize.isPresent() ? pageSize.get() : 0);
+    }
+    
+    /**
+     * Retrieve speed readings for a journey.
+     *
+     * @param spacecraftName
+     *      name of spacecrafr
+     * @param journeyId
+     *      journey identifier
+     * @param pageSize
+     *      page size
+     * @param pageState
+     *      page state
+     * @return
+     *      result page
+     */
+    public PagedResultWrapper<SpacecraftSpeedOverTime> getSpeedReading(
+            String spacecraftName, UUID journeyId, 
+            Optional<Integer> pageSize, Optional<String> pageState) {
+        PagingIterable<SpacecraftSpeedOverTime> daoResult = 
+                getSpaceCraftInstrumentsDao().getSpeedReading(spacecraftName, journeyId, pageSize, pageState);
+        return new PagedResultWrapper<SpacecraftSpeedOverTime>(daoResult, 
+                pageSize.isPresent() ? pageSize.get() : 0);
+    }
+    
+    /**
+     * Retrieve speed readings for a journey.
+     *
+     * @param spacecraftName
+     *      name of spacecrafr
+     * @param journeyId
+     *      journey identifier
+     * @param pageSize
+     *      page size
+     * @param pageState
+     *      page state
+     * @return
+     *      result page
+     */
+    public PagedResultWrapper<SpacecraftLocationOverTime> getLocationReading(
+            String spacecraftName, UUID journeyId, 
+            Optional<Integer> pageSize, Optional<String> pageState) {
+        PagingIterable<SpacecraftLocationOverTime> daoResult = 
+                getSpaceCraftInstrumentsDao().getLocationReading(spacecraftName, journeyId, pageSize, pageState);
+        return new PagedResultWrapper<SpacecraftLocationOverTime>(daoResult, 
                 pageSize.isPresent() ? pageSize.get() : 0);
     }
     
