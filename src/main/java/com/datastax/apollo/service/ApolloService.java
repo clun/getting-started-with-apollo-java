@@ -13,11 +13,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import com.datastax.apollo.dao.SessionManager;
+import com.datastax.apollo.dao.SpacecraftInstrumentsDao;
 import com.datastax.apollo.dao.SpacecraftJourneyDao;
 import com.datastax.apollo.dao.SpacecraftMapper;
 import com.datastax.apollo.dao.SpacecraftMapperBuilder;
 import com.datastax.apollo.entity.SpacecraftJourneyCatalog;
+import com.datastax.apollo.entity.SpacecraftTemperatureOverTime;
+import com.datastax.apollo.model.PagedResultWrapper;
 import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.PagingIterable;
 import com.datastax.oss.driver.api.core.uuid.Uuids;
 
 /**
@@ -30,8 +34,9 @@ public class ApolloService {
     /** Logger for the class. */
     private static final Logger LOGGER = LoggerFactory.getLogger(ApolloService.class);
    
-    /** Driver Dao. */
-    private SpacecraftJourneyDao spaceCraftJourneyDao;
+    /** Driver Daos. */
+    private SpacecraftJourneyDao     spacecraftJourneyDao;
+    private SpacecraftInstrumentsDao spacecraftInstrumentsDao;
     
     /**
      * Find all spacecrafts in the catalog.
@@ -92,13 +97,45 @@ public class ApolloService {
         return journeyUid;
     }
     
+    /**
+     * Retrieve temperature readings for a journey.
+     *
+     * @param spacecraftName
+     *      name of spacecrafr
+     * @param journeyId
+     *      journey identifier
+     * @param pageSize
+     *      page size
+     * @param pageState
+     *      page state
+     * @return
+     *      result page
+     */
+    public PagedResultWrapper<SpacecraftTemperatureOverTime> getTemperatureReading(
+            String spacecraftName, UUID journeyId, 
+            Optional<Integer> pageSize, Optional<String> pageState) {
+        PagingIterable<SpacecraftTemperatureOverTime> daoResult = 
+                getSpaceCraftInstrumentsDao().getTemperatureReading(spacecraftName, journeyId, pageSize, pageState);
+        return new PagedResultWrapper<SpacecraftTemperatureOverTime>(daoResult, 
+                pageSize.isPresent() ? pageSize.get() : 0);
+    }
+    
     protected synchronized SpacecraftJourneyDao getSpaceCraftJourneyDao() {
-        if (spaceCraftJourneyDao == null) {
+        if (spacecraftJourneyDao == null) {
             CqlSession cqlSession   = SessionManager.getInstance().connectToApollo();
             SpacecraftMapper mapper = new SpacecraftMapperBuilder(cqlSession).build();
-            this.spaceCraftJourneyDao = mapper.spacecraftJourneyDao(cqlSession.getKeyspace().get());
+            this.spacecraftJourneyDao = mapper.spacecraftJourneyDao(cqlSession.getKeyspace().get());
         }
-        return spaceCraftJourneyDao;
+        return spacecraftJourneyDao;
+    }
+    
+    protected synchronized SpacecraftInstrumentsDao getSpaceCraftInstrumentsDao() {
+        if (spacecraftInstrumentsDao == null) {
+            CqlSession cqlSession   = SessionManager.getInstance().connectToApollo();
+            SpacecraftMapper mapper = new SpacecraftMapperBuilder(cqlSession).build();
+            this.spacecraftInstrumentsDao = mapper.spacecraftInstrumentsDao(cqlSession.getKeyspace().get());
+        }
+        return spacecraftInstrumentsDao;
     }
     
     /**

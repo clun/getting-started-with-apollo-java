@@ -23,4 +23,7 @@ public interface SpacecraftMapper {
     @DaoFactory
     SpacecraftJourneyDao spacecraftJourneyDao(@DaoKeyspace CqlIdentifier keyspace);
     
+    @DaoFactory
+    SpacecraftInstrumentsDao spacecraftInstrumentsDao(@DaoKeyspace CqlIdentifier keyspace);
+    
 }
