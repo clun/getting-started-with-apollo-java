@@ -20,6 +20,8 @@ public class SessionManager {
     private boolean initialized = false;
     private CqlSession cqlSession;
     
+    public static final String QUERY_HEALTH_CHECK = "select data_center from system.local";
+    
     /**
      * Utility Method to initialized parameters.
      *
@@ -45,12 +47,36 @@ public class SessionManager {
      * @param keyspace
      *      current keyspace
      */
-    public void init(String userName, String password, String secureConnectionBundlePath, String keyspace) {
+    public void saveCredentials(String userName, String password, String keyspace, String secureConnectionBundlePath) {
         this.userName                   = userName;
         this.password                   = password;
-        this.secureConnectionBundlePath = secureConnectionBundlePath;
         this.keySpace                   = keyspace;
+        this.secureConnectionBundlePath = secureConnectionBundlePath;
         this.initialized                = true;
+    }
+    
+    /**
+     * Test with no persistence.
+     * 
+     * @param user
+     *      sample user name
+     * @param password
+     *      sample password
+     * @param keyspace
+     *      sample keyspace
+     * @param secureConnectionBundlePath
+     *      temp file
+     */
+    public void testCredentials(String user, String passwd, String keyspce, String secureConnectionBundlePath) {
+        // Autocloseable temporary session
+        try (CqlSession tmpSession = CqlSession.builder()
+                .withCloudSecureConnectBundle(secureConnectionBundlePath)
+                .withAuthCredentials(user, passwd)
+                .withKeyspace(keyspce).build()) {
+            tmpSession.execute(QUERY_HEALTH_CHECK);
+        } catch(RuntimeException re) {
+            throw new IllegalStateException(re);
+        }
     }
     
     /**
@@ -59,9 +85,9 @@ public class SessionManager {
      * @return
      *       current value of 'cqlSession'
      */
-    public CqlSession getCqlSession() {
+    public CqlSession connectToApollo() {
         if (!isInitialized()) {
-            throw new IllegalArgumentException("Please initialize the connection parameters first with init(...)");
+            throw new IllegalStateException("Please initialize the connection parameters first with saveCredentials(...)");
         }
         if (null == cqlSession) {
             cqlSession = CqlSession.builder().withCloudSecureConnectBundle(getSecureConnectionBundlePath())
@@ -72,6 +98,20 @@ public class SessionManager {
         return cqlSession;
     }
     
+    /**
+     * IfO simple command failing => invalid connection
+     */
+    public void checkConnection() {
+        try {
+            connectToApollo().execute(QUERY_HEALTH_CHECK);
+        } catch(RuntimeException re) {
+            throw new IllegalStateException(re);
+        }
+    }
+    
+    /**
+     * Cleanup session
+     */
     public void close() {
         if (isInitialized() && null != cqlSession) {
             cqlSession.close();

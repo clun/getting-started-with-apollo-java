@@ -25,10 +25,10 @@ import com.datastax.oss.driver.api.core.uuid.Uuids;
  * 
  */
 @Component
-public class SpacecraftServices {
+public class ApolloService {
 
     /** Logger for the class. */
-    private static final Logger LOGGER = LoggerFactory.getLogger(SpacecraftServices.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(ApolloService.class);
    
     /** Driver Dao. */
     private SpacecraftJourneyDao spaceCraftJourneyDao;
@@ -37,9 +37,8 @@ public class SpacecraftServices {
      * Find all spacecrafts in the catalog.
      */
     public List< SpacecraftJourneyCatalog > findAllSpacecrafts() {
-        if (null == spaceCraftJourneyDao) initDao();
         // no paging we don't expect more than 5k journeys
-        return spaceCraftJourneyDao.findAll().all(); 
+        return getSpaceCraftJourneyDao().findAll().all(); 
     }
     
     /**
@@ -51,9 +50,8 @@ public class SpacecraftServices {
      *      list of journeys
      */
     public List < SpacecraftJourneyCatalog > findAllJourneysForSpacecraft(String spacecraftName) {
-        if (null == spaceCraftJourneyDao) initDao();
         // no paging we don't expect more than 5k journeys
-        return spaceCraftJourneyDao.findAllJourneysForSpacecraft(spacecraftName).all();
+        return getSpaceCraftJourneyDao().findAllJourneysForSpacecraft(spacecraftName).all();
     }
     
     /**
@@ -67,8 +65,7 @@ public class SpacecraftServices {
      *      journey details if it exists
      */
     public Optional< SpacecraftJourneyCatalog > findJourneyById(String spacecraftName, UUID journeyId) {
-        if (null == spaceCraftJourneyDao) initDao();
-        return spaceCraftJourneyDao.findById(spacecraftName, journeyId);
+        return getSpaceCraftJourneyDao().findById(spacecraftName, journeyId);
     }
     
     /**
@@ -91,17 +88,17 @@ public class SpacecraftServices {
         dto.setEnd(Instant.now().plus(1000, ChronoUnit.MINUTES));
         dto.setActive(false);
         dto.setJourneyId(journeyUid);
-        spaceCraftJourneyDao.upsert(dto);
+        getSpaceCraftJourneyDao().upsert(dto);
         return journeyUid;
     }
     
-    /**
-     * Initialize Dao (SessionManager must have been initialized first).
-     */
-    protected void initDao() {
-        CqlSession cqlSession = SessionManager.getInstance().getCqlSession();
-        SpacecraftMapper mapper = new SpacecraftMapperBuilder(cqlSession).build(); 
-        this.spaceCraftJourneyDao = mapper.spacecraftJourneyDao(cqlSession.getKeyspace().get());
+    protected synchronized SpacecraftJourneyDao getSpaceCraftJourneyDao() {
+        if (spaceCraftJourneyDao == null) {
+            CqlSession cqlSession   = SessionManager.getInstance().connectToApollo();
+            SpacecraftMapper mapper = new SpacecraftMapperBuilder(cqlSession).build();
+            this.spaceCraftJourneyDao = mapper.spacecraftJourneyDao(cqlSession.getKeyspace().get());
+        }
+        return spaceCraftJourneyDao;
     }
     
     /**

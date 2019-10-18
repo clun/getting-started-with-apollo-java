@@ -1,4 +1,4 @@
-package com.datastax.apollo.conf;
+package com.datastax.apollo.doc;
 
 /*
  * #%L
@@ -61,7 +61,7 @@ public class DocumentationApiConfiguration {
      */
     private ApiInfo apiInfo() {
         ApiInfoBuilder builder = new ApiInfoBuilder();
-        builder.title("Apollo Getting Started RESTful API");
+        builder.title("Apollo Getting Started Backend API");
         builder.description("Start with Apollo in Minute");
         builder.version(GettingStartedWithApollo.class.getPackage().getImplementationVersion());
         return builder.build();
